@@ -107,8 +107,14 @@ async fn run_conn(conn: quinn::Incoming) -> anyhow::Result<()> {
 
     // Log all HTTP3 headers
     tracing::info!("HTTP3 headers:");
-    for (name, value) in &request.headers {
-        tracing::info!("  {}: {}", name, value);
+    if request.headers.is_empty() {
+        tracing::info!("  (empty headers)");
+    } else {
+        for (name, value) in request.headers.iter() {
+            if let Ok(value_str) = value.to_str() {
+                tracing::info!("  {}: {}", name, value_str);
+            }
+        }
     }
 
     // Accept the session.

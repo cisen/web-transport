@@ -83,7 +83,7 @@ pub struct ConnectRequest {
     pub protocols: Vec<String>,
 
     /// The raw HTTP/3 headers from the request.
-    pub headers: std::collections::HashMap<String, String>,
+    pub headers: http::HeaderMap,
 }
 
 impl ConnectRequest {
@@ -91,7 +91,7 @@ impl ConnectRequest {
         Self {
             url: url.into(),
             protocols: Vec::new(),
-            headers: std::collections::HashMap::new(),
+            headers: http::HeaderMap::new(),
         }
     }
 
@@ -153,9 +153,13 @@ impl ConnectRequest {
         let url = Url::parse(&format!("{scheme}://{authority}{path_and_query}"))?;
 
         // Save all headers
-        let mut raw_headers = std::collections::HashMap::new();
+        let mut raw_headers = http::HeaderMap::new();
         for (name, value) in headers.fields.iter() {
-            raw_headers.insert(name.clone(), value.clone());
+            if let Ok(header_name) = http::HeaderName::from_bytes(name.as_bytes()) {
+                if let Ok(header_value) = http::HeaderValue::from_str(value) {
+                    raw_headers.append(header_name, header_value);
+                }
+            }
         }
 
         Ok(Self { url, protocols, headers: raw_headers })
@@ -171,7 +175,9 @@ impl ConnectRequest {
         let mut headers = qpack::Headers::default();
         // Add all saved headers first
         for (name, value) in self.headers.iter() {
-            headers.set(name, value);
+            if let Ok(value_str) = value.to_str() {
+                headers.set(name.as_str(), value_str);
+            }
         }
         headers.set(":method", "CONNECT");
         headers.set(":scheme", self.url.scheme());
@@ -213,7 +219,7 @@ impl From<Url> for ConnectRequest {
         Self {
             url,
             protocols: Vec::new(),
-            headers: std::collections::HashMap::new(),
+            headers: http::HeaderMap::new(),
         }
     }
 }
